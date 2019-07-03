@@ -1,3 +1,3 @@
 FROM microsoft/azure-cli
 COPY . .
-ENTRYPOINT ["/bin/bash"] 
+ENTRYPOINT ["/bin/bash","acrdelete.sh"] 
