@@ -6,8 +6,7 @@ ServicePrincipalId="fb3fd119-f2bb-4316-b737-18af99a89185"
 ServicePrincipalPass="RUStrnNHx0fZzvqjQBQWwHIfbQc/PLNhBiydJAQlqKQ="
 ServicePrincipalTenant="81fa766e-a349-4867-8bf4-ab35e250a08f"
 ACR_NAME="smcpacr"
-REPO_NAME="dotnetapp"
-RENTENTION_IMAGE=10
+RENTENTION_IMAGE=8
 SubscriptionName="GCS_01"
 }
 
@@ -21,55 +20,32 @@ az login --service-principal -u $ServicePrincipalId -p $ServicePrincipalPass --t
 echo "Setting subscription to: $SubscriptionName"
 az account set --subscription $SubscriptionName
 
-echo " Azure account used is..."
-az account show
 }
 
 DELETE_ACR_IMAGES()
 {
-#GET all the tags for the given repository for the given ACR
-getalltags()
-{
- az acr repository show-tags -n $ACR_NAME --repository $REPO_NAME  --orderby time_desc -o tsv
-}
 
+Starttime=$(date +"%m-%d-%Y-%T")
+echo $Starttime "Start time"
 
-#Get top ten images in the repository for the given ACR
+# Number of newest images in repository that will not be deleted
+declare -a REPOSITORIES
+for ACR in $ACR_NAME; do
+  REPOSITORIES=$(az acr repository list -n $ACR -o tsv)
+  printf '%s\n' "${REPOSITORIES[@]}"
+  for REPO in $REPOSITORIES; do
+    echo "Old Images will be deleted form the repository:" "$REPO"
+    OLD_IMAGES=$(az acr repository show-tags --name $ACR --repository $REPO --orderby time_asc -o tsv | head -n -$RENTENTION_IMAGE)
 
-gettoptentags()
-{
-az acr repository show-tags -n $ACR_NAME --repository $REPO_NAME --top $RENTENTION_IMAGE --orderby time_desc -o tsv 
-}
-
-declare -a All
-declare -a Topten
-All=$(getalltags)
-Topten=$(gettoptentags)
-#Display All the images in the repository
-
-printf " All Images:  \n\n $All \n\n "
-
-#Display only top ten images in the repository
-printf " Top Ten Images:  \n\n $Topten \n\n"
-
-#TotalcountofImages=$(echo "$All" | wc -l)
-
-#echo TotalcountofImages "$TotalcountofImages"
-# Display the difference between All tags and Top Ten tags ( B-A concept using comm operator)
-declare -a C
-C=($(comm -3 <(printf '%s\n' "${All[@]}" | LC_ALL=C sort) <(printf '%s\n' "${Topten[@]}" | LC_ALL=C sort)))
-printf '%s\n' "${C[@]}"
-: '
-TobeDeletedListcount=$(echo "$C" | wc -l)
-echo TotalcountofImages "$TobeDeletedListcount"
-'
-
- for i in "${C[@]}"
- do 
- echo Deleting image $i 
- #az acr repository delete -n $ACR_NAME --image $REPO_NAME:$i --yes
- done
-
+    for OLD_IMAGE in $OLD_IMAGES; do
+	echo $OLD_IMAGE "deleting the image"
+       az acr repository delete --name $ACR --image $REPO:$OLD_IMAGE --yes
+	  
+    done
+  done
+done
+Endtime=$(date +"%m-%d-%Y-%T")
+echo $Endtime "End time "
 }
 
 #To logout from azure subscription
@@ -78,30 +54,12 @@ AZ_LOGOUT()
 {
 echo " Logging out from the subscription "
 az logout
-#az accout show
-
 }
-
 
 GET_VARIABLES
 AUTHENTICATE_TO_AZURE
 DELETE_ACR_IMAGES
 AZ_LOGOUT
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
